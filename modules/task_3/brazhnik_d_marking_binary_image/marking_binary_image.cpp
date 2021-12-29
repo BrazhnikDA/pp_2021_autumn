@@ -87,31 +87,8 @@ step_first(const std::vector<int>& data, int w, int h, int startMarked) {
 
 std::vector<int> step_second(std::vector<int> tmpMap, int w, int h, std::vector<int> nonoverlapping) {
     int size = w * h;
-    int realSize = size - 1;
-
     std::vector<int> result(size);
     int resCountPix = size;
-
-    int left = tmpMap[size - w];
-    int top = tmpMap[size - 2];
-
-    if ((left == 0) && (top == 0)) {
-        resCountPix--;
-        result[realSize] = tmpMap[resCountPix];
-    }
-    if ((left != 0) && (top == 0)) {
-        result[realSize] = left;
-    }
-    if ((left == 0) && (top != 0)) {
-        result[realSize] = top;
-    }
-    if ((left != 0) && (top != 0)) {
-        if (left < top) {
-            result[realSize] = left;
-        } else {
-            result[realSize] = top;
-        }
-    }
 
     for (int i = 0; i < resCountPix; i++) {
         int curPix = tmpMap[i];
@@ -180,11 +157,11 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
     }
 
     int size = w * h;
-    int sizeBlock = h / countProc * w;
-    int elementsRemaining = (h % countProc) * w;
+    int sizeBlock = size / countProc;
+    int elementsRemaining = size % countProc;
     std::vector<int> result(size);
 
-    if (sizeBlock == 0 || countProc < sizeBlock) {
+    if (sizeBlock == 0 || countProc <= sizeBlock) {
         if (commRank == 0) {
            return basic_marking_binary_image(data, w, h);
         } else {
@@ -209,18 +186,15 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
         MPI_Recv(localData.data(), sizeBlock, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
     }
 
-    int tmpW = 0;
-    int tmpH = 0;
+    std::pair<std::vector<int>, std::pair<std::vector<int>, int>> stepFirst;
     if (commRank == 0) {
-        tmpW = (elementsRemaining + sizeBlock) / w;
-        tmpH = sizeBlock * commRank;
+        stepFirst = step_first(
+            localData, (elementsRemaining + sizeBlock) / w, sizeBlock * commRank);
     } else {
-        tmpW = sizeBlock / w;
-        tmpH = elementsRemaining + sizeBlock * commRank;
+        stepFirst = step_first(
+            localData, sizeBlock / w, elementsRemaining + sizeBlock * commRank);
     }
-
-    std::pair<std::vector<int>, std::pair<std::vector<int>, int>> stepFirst = step_first(localData, tmpW, tmpH);
-
+    
     std::vector<int> map = stepFirst.first;
     std::vector<int> rastoyanie = stepFirst.second.first;
     int localMarkCount = stepFirst.second.second;
@@ -237,54 +211,26 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
         recvCounts[proc] = sizeBlock;
     }
 
-    int sendCount = 0;
-    if (commRank == 0)
-        sendCount = sizeBlock + elementsRemaining;
-    else
-        sendCount = sizeBlock;
-
     std::vector<int> globalRastoyanie(size);
-    MPI_Gatherv(rastoyanie.data(), sendCount, MPI_INT, globalRastoyanie.data(), recvCounts.data(),
-        displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
-
     std::vector<int> globalMap(size);
-    MPI_Gatherv(map.data(), sendCount, MPI_INT, globalMap.data(), recvCounts.data(),
-        displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
+    if (commRank == 0) {
+        MPI_Gatherv(rastoyanie.data(), sizeBlock + elementsRemaining, MPI_INT,
+            globalRastoyanie.data(), recvCounts.data(), displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(map.data(), sizeBlock + elementsRemaining, MPI_INT, globalMap.data(), recvCounts.data(),
+            displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
+    }
+    else {
+        MPI_Gatherv(rastoyanie.data(), sizeBlock, MPI_INT, globalRastoyanie.data(), recvCounts.data(),
+            displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(map.data(), sizeBlock, MPI_INT, globalMap.data(), recvCounts.data(),
+            displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
+    }
 
     int globalMarkCount = 0;
     MPI_Reduce(&localMarkCount, &globalMarkCount, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
     if (commRank == 0) {
-        for (int i = 1; i < countProc; i++) {
-            int beginOffsetTop = elementsRemaining + sizeBlock * i;
-            int secondOffsetLeft = beginOffsetTop - w;
-
-            for (int offset = 0; offset < w; offset++) {
-                int left = globalMap[secondOffsetLeft + offset];
-                int top = globalMap[beginOffsetTop + offset];
-
-                if ((left != 0) && (top != 0)) {
-                    int rastoyanieLeft = globalRastoyanie[left];
-                    int rastoyanieTop = globalRastoyanie[top];
-
-                    if (rastoyanieLeft != rastoyanieTop) {
-                        int maxLT = std::max(left, top);
-                        while (globalRastoyanie[maxLT] != maxLT) {
-                            maxLT = globalRastoyanie[maxLT];
-                        }
-                        int minLT = std::min(left, top);
-                        while (globalRastoyanie[minLT] != minLT) {
-                            minLT = globalRastoyanie[minLT];
-                        }
-                        if (maxLT != minLT) {
-                            globalRastoyanie[maxLT] = minLT;
-                            globalMarkCount--;
-                        }
-                    }
-                }
-            }
-        }
         result = step_second(globalMap, w, h, globalRastoyanie);
+        return { result, globalMarkCount };
     }
-    return { result, globalMarkCount };
 }
