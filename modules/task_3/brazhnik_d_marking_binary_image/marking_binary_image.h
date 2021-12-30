@@ -8,8 +8,8 @@
 #include <vector>
 #include <gtest-mpi-listener.hpp>
 
-#ifndef FOR_DELETE_MARKING_BINARY_IMAGE_H_
-#define FOR_DELETE_MARKING_BINARY_IMAGE_H_
+#ifndef MODULES_TASK_3_BRAZHNIK_D_MARKING_BINARY_IMAGE_MARKING_BINARY_IMAGE_H_
+#define MODULES_TASK_3_BRAZHNIK_D_MARKING_BINARY_IMAGE_MARKING_BINARY_IMAGE_H_
 
 std::vector<int> generate_binary_image(int w, int h);
 
@@ -23,4 +23,4 @@ std::pair<std::vector<int>, int> basic_marking_binary_image(
 std::pair<std::vector<int>, int> parallel_marking_binary_image(
     const std::vector<int>& data, int w, int h);
 
-#endif  // FOR_DELETE_MARKING_BINARY_IMAGE_H_
+#endif  // MODULES_TASK_3_BRAZHNIK_D_MARKING_BINARY_IMAGE_MARKING_BINARY_IMAGE_H_

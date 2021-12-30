@@ -90,7 +90,7 @@ std::vector<int> step_second(
     int size = w * h;
     std::vector<int> result(size);
 
-    int i = 0;
+    size_t i = 0;
     for (i = 0; i < size; i++) {
         if (tmpMap.size() < i) {
             int curPix = tmpMap[i];
