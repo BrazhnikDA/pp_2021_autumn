@@ -1,7 +1,7 @@
 // Copyright 2021 Brazhnik Dmitry
 #include "../../../modules/task_3/brazhnik_d_marking_binary_image/marking_binary_image.h"
 
-TEST(Parallel_Operations_MPI, TEST_GENERATE_BINARY_IMAGE_SIZE_3x5_VALUE_ONLY_0_1) {
+TEST(Parallel_Operations_MPI, TEST_BINARY_IMAGE_3x5) {
     int commRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &commRank);
 
@@ -14,7 +14,7 @@ TEST(Parallel_Operations_MPI, TEST_GENERATE_BINARY_IMAGE_SIZE_3x5_VALUE_ONLY_0_1
     }
 }
 
-TEST(Parallel_Operations_MPI, TEST_GENERATE_BINARY_IMAGE_NEGATIVE_SIZE_EXCEPTION) {
+TEST(Parallel_Operations_MPI, TEST_NEGATIVE_SIZE_EXCEPTION) {
     int commRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &commRank);
 
@@ -41,8 +41,8 @@ TEST(Parallel_Operations_MPI, TEST_BASIC_MARKING_IMAGE_SIZE_5x5_TRUE) {
         0, 1, 0, 0, 1
     };
 
-    std::pair<std::vector<int>, int> resultSecond = basic_marking_binary_image(data, sizeX, sizeY);
-
+    std::pair<std::vector<int>, int> resultSecond =
+        basic_marking_binary_image(data, sizeX, sizeY);
 
     if (commRank == 0) {
         ASSERT_EQ(resultSecond.second, 3);
@@ -76,7 +76,8 @@ TEST(Parallel_Operations_MPI, TEST_TIME_BASIC_MARKING_IMAGE_SIZE_10x10) {
     if (commRank == 0) {
         timeBasicStart = MPI_Wtime();
     }
-    std::pair<std::vector<int>, int> resultParallel = basic_marking_binary_image(data, sizeX, sizeY);
+    std::pair<std::vector<int>, int> resultParallel =
+        basic_marking_binary_image(data, sizeX, sizeY);
 
     if (commRank == 0) {
         timeBasicFinish = MPI_Wtime();
@@ -120,7 +121,8 @@ TEST(Parallel_Operations_MPI, TEST_TIME_PARALLEL_10x10_COMP_1) {
     if (commRank == 0) {
         timeParallelStart = MPI_Wtime();
     }
-    std::pair<std::vector<int>, int> result = parallel_marking_binary_image(data, sizeX, sizeY);
+    std::pair<std::vector<int>, int> result =
+        parallel_marking_binary_image(data, sizeX, sizeY);
     if (commRank == 0) {
         timeParallelFinish = MPI_Wtime();
     }
@@ -150,13 +152,15 @@ TEST(Parallel_Operations_MPI, TEST_PARALLEL_LARGE_IMAGE_50x50_TIME) {
     if (commRank == 0) {
         timeParallelStart = MPI_Wtime();
     }
-    std::pair<std::vector<int>, int> result = parallel_marking_binary_image(data, sizeX, sizeY);
+    std::pair<std::vector<int>, int> result =
+        parallel_marking_binary_image(data, sizeX, sizeY);
     if (commRank == 0) {
         timeParallelFinish = MPI_Wtime();
     }
 
     if (commRank == 0) {
-        printf("Time parallel: %f\n", timeParallelFinish - timeParallelStart);
+        printf("Time parallel: %f\n",
+            timeParallelFinish - timeParallelStart);
     }
 }
 
@@ -165,7 +169,8 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
     ::testing::AddGlobalTestEnvironment(new GTestMPIListener::MPIEnvironment);
-    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    ::testing::TestEventListeners& listeners =
+        ::testing::UnitTest::GetInstance()->listeners();
 
     listeners.Release(listeners.default_result_printer());
     listeners.Release(listeners.default_xml_generator());

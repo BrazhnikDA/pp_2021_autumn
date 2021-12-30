@@ -32,14 +32,12 @@ step_first(const std::vector<int>& data, int w, int h, int startMarked) {
                 int left, top;
                 if (index < w) {
                     left = 0;
-                }
-                else {
+                } else {
                     left = copyData[index - w];
                 }
                 if ((index < 1) || ((index - 1) / w != x)) {
                     top = 0;
-                }
-                else {
+                } else {
                     top = copyData[index - 1];
                 }
                 if ((left == 0) && (top == 0)) {
@@ -55,8 +53,7 @@ step_first(const std::vector<int>& data, int w, int h, int startMarked) {
                 if ((left != 0) && (top != 0)) {
                     if (left == top) {
                         copyData[index] = left;
-                    }
-                    else {
+                    } else {
                         int maxFS;
                         if (left > top)
                             maxFS = left;
@@ -88,11 +85,10 @@ step_first(const std::vector<int>& data, int w, int h, int startMarked) {
     return { copyData, {nonoverlapping, markMax} };
 }
 
-std::vector<int> step_second(std::vector<int> tmpMap, int w, int h, std::vector<int> nonoverlapping) {
+std::vector<int> step_second(
+    std::vector<int> tmpMap, int w, int h, std::vector<int> nonoverlapping) {
     int size = w * h;
-    //std::cout << "ASize: " << size << "\n";
     std::vector<int> result(size);
-    //std::cout << "BSize: " << size << "\n";
 
     int i = 0;
     for (i = 0; i < size; i++) {
@@ -101,8 +97,7 @@ std::vector<int> step_second(std::vector<int> tmpMap, int w, int h, std::vector<
             if (curPix != 0) {
                 if (nonoverlapping[curPix] == curPix) {
                     result[i] = curPix;
-                }
-                else {
+                } else {
                     while (nonoverlapping[curPix] != curPix) {
                         curPix = nonoverlapping[curPix];
                     }
@@ -114,15 +109,20 @@ std::vector<int> step_second(std::vector<int> tmpMap, int w, int h, std::vector<
     return result;
 }
 
-std::pair<std::vector<int>, int> basic_marking_binary_image(const std::vector<int>& data, int w, int h) {
-    std::pair<std::vector<int>, std::pair<std::vector<int>, int>> firstStep = step_first(data, w, h);
-    std::vector<int> secondStep = step_second(firstStep.first, w, h, firstStep.second.first);
-    std::pair<std::vector<int>, int> result = std::make_pair(secondStep, firstStep.second.second);
+std::pair<std::vector<int>, int>
+basic_marking_binary_image(const std::vector<int>& data, int w, int h) {
+    std::pair<std::vector<int>, std::pair<std::vector<int>, int>>
+        firstStep = step_first(data, w, h);
+    std::vector<int> secondStep =
+        step_second(firstStep.first, w, h, firstStep.second.first);
+    std::pair<std::vector<int>, int> result
+        = std::make_pair(secondStep, firstStep.second.second);
 
     return result;
 }
 
-std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector<int>& data, int w, int h) {
+std::pair<std::vector<int>, int>
+parallel_marking_binary_image(const std::vector<int>& data, int w, int h) {
     int countProc, commRank;
     MPI_Comm_size(MPI_COMM_WORLD, &countProc);
     MPI_Comm_rank(MPI_COMM_WORLD, &commRank);
@@ -140,8 +140,7 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
     if (sizeBlock == 0 || countProc < sizeBlock) {
         if (commRank == 0) {
             return basic_marking_binary_image(data, w, h);
-        }
-        else {
+        } else {
             return std::make_pair(result, 0);
         }
     }
@@ -151,17 +150,19 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
             int tmp = elementsRemaining + i * sizeBlock;
             if (sizeBlock % countProc == 0)
                 tmp--;
-            MPI_Send(data.data() + tmp, sizeBlock, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Send(data.data() + tmp, sizeBlock,
+                MPI_INT, i, 0, MPI_COMM_WORLD);
         }
     }
 
     std::vector<int> localData(sizeBlock + elementsRemaining);
     if (commRank == 0) {
-        localData = std::vector<int>(data.cbegin(), data.cbegin() + sizeBlock + elementsRemaining);
-    }
-    else {
+        localData = std::vector<int>(data.cbegin(),
+            data.cbegin() + sizeBlock + elementsRemaining);
+    } else {
         MPI_Status status;
-        MPI_Recv(localData.data(), sizeBlock, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(localData.data(), sizeBlock, MPI_INT,
+            0, 0, MPI_COMM_WORLD, &status);
     }
 
     int tmpW = 0;
@@ -169,13 +170,13 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
     if (commRank == 0) {
         tmpW = (elementsRemaining + sizeBlock) / w;
         tmpH = sizeBlock * commRank;
-    }
-    else {
+    } else {
         tmpW = sizeBlock / w;
         tmpH = elementsRemaining + sizeBlock * commRank;
     }
 
-    std::pair<std::vector<int>, std::pair<std::vector<int>, int>> stepFirst = step_first(localData, tmpW, tmpH);
+    std::pair<std::vector<int>, std::pair<std::vector<int>, int>>
+        stepFirst = step_first(localData, tmpW, tmpH);
 
     std::vector<int> map = stepFirst.first;
     std::vector<int> rastoyanie = stepFirst.second.first;
@@ -197,22 +198,27 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
     std::vector<int> globalMap(size);
     if (commRank == 0) {
         MPI_Gatherv(rastoyanie.data(), sizeBlock + elementsRemaining, MPI_INT,
-            globalRastoyanie.data(), recvCounts.data(), displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Gatherv(map.data(), sizeBlock + elementsRemaining, MPI_INT, globalMap.data(), recvCounts.data(),
+            globalRastoyanie.data(), recvCounts.data(),
             displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
-    }
-    else {
-        MPI_Gatherv(rastoyanie.data(), sizeBlock, MPI_INT, globalRastoyanie.data(), recvCounts.data(),
+        MPI_Gatherv(map.data(), sizeBlock + elementsRemaining,
+            MPI_INT, globalMap.data(), recvCounts.data(),
             displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Gatherv(map.data(), sizeBlock, MPI_INT, globalMap.data(), recvCounts.data(),
+    } else {
+        MPI_Gatherv(rastoyanie.data(), sizeBlock, MPI_INT,
+            globalRastoyanie.data(), recvCounts.data(),
+            displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(map.data(), sizeBlock, MPI_INT,
+            globalMap.data(), recvCounts.data(),
             displs.data(), MPI_INT, 0, MPI_COMM_WORLD);
     }
 
     int globalMarkCount = 0;
-    MPI_Reduce(&localMarkCount, &globalMarkCount, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&localMarkCount, &globalMarkCount, 1,
+        MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
     if (commRank == 0) {
-        result = step_second(globalMap, w, h, globalRastoyanie);
+        result =
+            step_second(globalMap, w, h, globalRastoyanie);
     }
     return { result, globalMarkCount };
 }
