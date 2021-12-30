@@ -87,50 +87,24 @@ step_first(const std::vector<int>& data, int w, int h, int startMarked) {
 
 std::vector<int> step_second(std::vector<int> tmpMap, int w, int h, std::vector<int> nonoverlapping) {
     int size = w * h;
+    //std::cout << "ASize: " << size << "\n";
     std::vector<int> result(size);
-    int resCountPix = size;
+    //std::cout << "BSize: " << size << "\n";
 
-    for (int i = 0; i < resCountPix; i++) {
-        int curPix = tmpMap[i];
-        if (curPix != 0) {
-            if (nonoverlapping[curPix] == curPix) {
-                result[i] = curPix;
-            } else {
-                while (nonoverlapping[curPix] != curPix) {
-                    curPix = nonoverlapping[curPix];
+    int i = 0;
+    for (i = 0; i < size; i++) {
+        if (tmpMap.size() < i) {
+            int curPix = tmpMap[i];
+            if (curPix != 0) {
+                if (nonoverlapping[curPix] == curPix) {
+                    result[i] = curPix;
                 }
-                result[i] = curPix;
-            }
-        }
-    }
-    return result;
-}
-
-std::vector<int> set_mark(const std::vector<int>& data, int w, int h) {
-    int size = w * h;
-    int center = size / 2 + 1;
-    int markMax = 0;
-
-    std::vector<int> result(size);
-    std::vector<int> badLabels(center);
-    std::vector<int> correctlyLabels(center);
-
-    for (int i = 0; i < size; i++) {
-        int pixel = data[i];
-        if (pixel != 0) {
-            int idx = -1;
-            for (int k = 1; badLabels[k] != 0; k++)
-                if (badLabels[k] == pixel) {
-                    idx = k;
-                    break;
+                else {
+                    while (nonoverlapping[curPix] != curPix) {
+                        curPix = nonoverlapping[curPix];
+                    }
+                    result[i] = curPix;
                 }
-            if (idx == -1) {
-                markMax++;
-                badLabels[markMax] = pixel;
-                correctlyLabels[markMax] = markMax;
-                result[i] = correctlyLabels[markMax];
-            } else {
-                result[i] = correctlyLabels[idx];
             }
         }
     }
@@ -138,11 +112,19 @@ std::vector<int> set_mark(const std::vector<int>& data, int w, int h) {
 }
 
 std::pair<std::vector<int>, int> basic_marking_binary_image(const std::vector<int>& data, int w, int h) {
+    //std::cout << "Data: " << data.empty() << " W: " << w << " H: " << h << "\n";
     std::pair<std::vector<int>, std::pair<std::vector<int>, int>> firstStep = step_first(data, w, h);
+
+    /*std::cout << "After First: \nSize: " << firstStep.first.size() << " Size two: " << firstStep.second.first.size() <<
+        " Count: " << firstStep.second.second << "\n";*/
+
     std::vector<int> secondStep = step_second(firstStep.first, w, h, firstStep.second.first);
 
-    std::pair<std::vector<int>, int> result = std::make_pair(secondStep, firstStep.second.second);
+    //std::cout << "After Second: \nSize: " << secondStep.size() << "\n";
 
+    std::pair<std::vector<int>, int> result = std::make_pair(secondStep, firstStep.second.second);
+    //std::cout << "Resault: " << result.first.size() << " , Count mark : " << result.second << "\n";
+    
     return result;
 }
 
@@ -157,14 +139,15 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
     }
 
     int size = w * h;
-    int sizeBlock = size / countProc;
-    int elementsRemaining = size % countProc;
+    int sizeBlock = h / countProc * w;
+    int elementsRemaining = (h % countProc) * w;
     std::vector<int> result(size);
 
-    if (sizeBlock == 0 || countProc <= sizeBlock) {
+    if (sizeBlock == 0 || countProc < sizeBlock) {
         if (commRank == 0) {
-           return basic_marking_binary_image(data, w, h);
-        } else {
+            return basic_marking_binary_image(data, w, h);
+        }
+        else {
             return std::make_pair(result, 0);
         }
     }
@@ -181,20 +164,25 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
     std::vector<int> localData(sizeBlock + elementsRemaining);
     if (commRank == 0) {
         localData = std::vector<int>(data.cbegin(), data.cbegin() + sizeBlock + elementsRemaining);
-    } else {
+    }
+    else {
         MPI_Status status;
         MPI_Recv(localData.data(), sizeBlock, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
     }
 
-    std::pair<std::vector<int>, std::pair<std::vector<int>, int>> stepFirst;
+    int tmpW = 0;
+    int tmpH = 0;
     if (commRank == 0) {
-        stepFirst = step_first(
-            localData, (elementsRemaining + sizeBlock) / w, sizeBlock * commRank);
-    } else {
-        stepFirst = step_first(
-            localData, sizeBlock / w, elementsRemaining + sizeBlock * commRank);
+        tmpW = (elementsRemaining + sizeBlock) / w;
+        tmpH = sizeBlock * commRank;
     }
-    
+    else {
+        tmpW = sizeBlock / w;
+        tmpH = elementsRemaining + sizeBlock * commRank;
+    }
+
+    std::pair<std::vector<int>, std::pair<std::vector<int>, int>> stepFirst = step_first(localData, tmpW, tmpH);
+
     std::vector<int> map = stepFirst.first;
     std::vector<int> rastoyanie = stepFirst.second.first;
     int localMarkCount = stepFirst.second.second;
@@ -231,6 +219,6 @@ std::pair<std::vector<int>, int> parallel_marking_binary_image(const std::vector
 
     if (commRank == 0) {
         result = step_second(globalMap, w, h, globalRastoyanie);
-        return { result, globalMarkCount };
     }
+    return { result, globalMarkCount };
 }
